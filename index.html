@@ -82,7 +82,27 @@
     <span class="dot" data-i="2"></span>
   </div>
 
-  <button id="mute" aria-label="Toggle sound">&#128266;</button>
+  <button id="mute" aria-label="Toggle sound"></button>
+
+  <button id="palette" aria-label="Change color">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="13.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="17.5" cy="10.5" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="8.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="6.5" cy="12.5" r="1.4" fill="currentColor" stroke="none"/>
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.4 0 2.5-1.1 2.5-2.5 0-.6-.2-1.1-.6-1.5-.3-.4-.5-.8-.5-1.4 0-1.1.9-2 2-2H17c2.8 0 5-2.2 5-5 0-4.4-4.5-8-10-8z"/>
+    </svg>
+  </button>
+  <div id="swatches">
+    <button class="sw" style="--c:#ffffff" data-col="#ffffff" data-glow="255,255,255"></button>
+    <button class="sw" style="--c:#00e5ff" data-col="#00e5ff" data-glow="0,229,255"></button>
+    <button class="sw" style="--c:#3b82f6" data-col="#3b82f6" data-glow="59,130,246"></button>
+    <button class="sw" style="--c:#2bff88" data-col="#2bff88" data-glow="43,255,136"></button>
+    <button class="sw" style="--c:#ffe600" data-col="#ffe600" data-glow="255,230,0"></button>
+    <button class="sw" style="--c:#ff9500" data-col="#ff9500" data-glow="255,149,0"></button>
+    <button class="sw" style="--c:#ff3ba7" data-col="#ff3ba7" data-glow="255,59,167"></button>
+    <button class="sw" style="--c:#b15cff" data-col="#b15cff" data-glow="177,92,255"></button>
+  </div>
 
   <div id="portrait-msg">
     <span>&#8635;</span>

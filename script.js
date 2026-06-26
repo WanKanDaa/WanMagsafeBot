@@ -458,7 +458,8 @@ function lookAt(cx, cy) {
 
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('#portrait-msg') || e.target.closest('#dots') ||
-      e.target.closest('#mute') || e.target.closest('.music-controls')) return;
+      e.target.closest('#mute') || e.target.closest('.music-controls') ||
+      e.target.closest('#palette') || e.target.closest('#swatches')) return;
   pointerDown = true;
   gx = e.clientX; gy = e.clientY; gt = Date.now(); gMode = null;
   longPress = setTimeout(() => {              // long-press → wink (eyes page only)
@@ -545,8 +546,14 @@ window.addEventListener('resize', () => dragTo(-pageIndex * pageW()));
 
 // ─── AUDIO UNLOCK + MUTE TOGGLE ──────────────────────────────────────────────
 const muteBtn = document.getElementById('mute');
+const ICON_SOUND_ON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>';
+const ICON_SOUND_OFF =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
 function updateMuteIcon() {
-  muteBtn.textContent = SFX.muted ? '\u{1F507}' : '\u{1F50A}';  // 🔇 / 🔊
+  muteBtn.innerHTML = SFX.muted ? ICON_SOUND_OFF : ICON_SOUND_ON;
   muteBtn.classList.toggle('muted', SFX.muted);
 }
 function unlockAudio() {
@@ -566,6 +573,40 @@ muteBtn.addEventListener('click', (e) => {
   if (!SFX.muted) SFX.tapS();
 });
 updateMuteIcon();
+
+// ─── COLOR PALETTE ───────────────────────────────────────────────────────────
+const paletteBtn = document.getElementById('palette');
+const swatchEls  = Array.from(document.querySelectorAll('.sw'));
+
+function applyColor(col, glow, save = true) {
+  document.documentElement.style.setProperty('--col', col);
+  document.documentElement.style.setProperty('--glow', glow);
+  swatchEls.forEach(s => s.classList.toggle('active', s.dataset.col.toLowerCase() === col.toLowerCase()));
+  if (save) { try { localStorage.setItem('roboColor', JSON.stringify({ col, glow })); } catch (e) {} }
+}
+
+paletteBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.body.classList.toggle('palette-open');
+});
+swatchEls.forEach(s => s.addEventListener('click', (e) => {
+  e.stopPropagation();
+  applyColor(s.dataset.col, s.dataset.glow);
+  document.body.classList.remove('palette-open');
+  SFX.tapS();
+}));
+// close the palette when tapping elsewhere
+document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#palette') && !e.target.closest('#swatches'))
+    document.body.classList.remove('palette-open');
+});
+
+// restore saved color (default white)
+try {
+  const saved = JSON.parse(localStorage.getItem('roboColor'));
+  if (saved && saved.col) applyColor(saved.col, saved.glow, false);
+  else applyColor('#ffffff', '255,255,255', false);
+} catch (e) { applyColor('#ffffff', '255,255,255', false); }
 
 // ─── CLOCK (Bangkok · GMT+7) ─────────────────────────────────────────────────
 const clH = document.getElementById('cl-h');
