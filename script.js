@@ -262,9 +262,11 @@ function idleAct() {
   if (!glitching && !pointerDown && !behaviorStop && !booting &&
       pageIndex === 1 && currentMood === 'DEFAULT') {
     const r = Math.random();
-    if (r < 0.40)      browFlick();
-    else if (r < 0.73) lookAround();
-    else               headTilt();
+    if (r < 0.20)      winkOne(Math.random() < 0.5 ? innerL : innerR);
+    else if (r < 0.42) browFlick();
+    else if (r < 0.64) lookAround();
+    else if (r < 0.82) headTilt();
+    else { blink(70, 0, 120); setTimeout(() => { blinking = false; blink(70, 0, 120, true); }, 300); }
   }
   setTimeout(idleAct, 4000 + Math.random() * 5000);
 }
@@ -323,7 +325,7 @@ const MOODS = {
   DEFAULT:    {},
   HAPPY:      { bright: 1, radius: 'var(--r) var(--r) calc(var(--eh)*0.5) calc(var(--eh)*0.5)' },
   EXCITED:    { bright: 1, scl: [1.1, 1.1], behavior: 'bounce' },
-  LOVE:       { bright: 1, radius: '50% 50% 45% 45%', behavior: 'heartbeat' },
+  LOVE:       { bright: 1, radius: 'calc(var(--ew)*0.5) / calc(var(--eh)*0.5)', behavior: 'heartbeat' },
   TIRED:      { top: [[-78,-13],[-78,13]], gazeDown: 6 },
   SLEEPY:     { top: [[-66,-5],[-66,5]], gazeDown: 9, slow: 1 },
   ANGRY:      { top: [[-74,15],[-74,-15]] },
@@ -378,6 +380,8 @@ function applyMood(name, { scheduleNext = false } = {}) {
   if (m.gazeDown) gazeTgt.y = m.gazeDown;
   faceEl.classList.toggle('bright', !!m.bright);
 
+  if (!m.behavior) setTimeout(() => blink(), 130);
+
   if (m.behavior === 'bounce')    behaviorBounce();
   if (m.behavior === 'heartbeat') behaviorHeartbeat();
   if (m.behavior === 'dizzy')     behaviorDizzy();
@@ -387,7 +391,7 @@ function applyMood(name, { scheduleNext = false } = {}) {
 
   // LOVE → floating hearts/sparkles (chained onto behaviorStop cleanup)
   if (name === 'LOVE') {
-    spawnSparkles();
+    setTimeout(spawnSparkles, 260);   // delay so it doesn't hitch the shape transition
     const sid = setInterval(() => spawnSparkles(4), 1500);
     const prevStop = behaviorStop;
     behaviorStop = () => { clearInterval(sid); if (prevStop) prevStop(); };
@@ -444,6 +448,7 @@ function behaviorScared() {
   const id = setInterval(() => {
     gazeTgt.x = (Math.random() - 0.5) * MAX_X * 2;
     gazeTgt.y = (Math.random() - 0.5) * MAX_Y * 2;
+    if (Math.random() < 0.3) { blinking = false; blink(45, 0, 70, true); }
   }, 200);
   behaviorStop = () => { clearInterval(id); gazeTgt.x = 0; gazeTgt.y = 0; };
 }
@@ -643,6 +648,7 @@ function endPointer(e) {
       touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
     }
   } else {                                                      // was a look-drag
+    setTimeout(() => blink(60, 0, 120), 80);
     clearTimeout(touchReset);
     touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
   }
@@ -736,7 +742,6 @@ const clH = document.getElementById('cl-h');
 const clM = document.getElementById('cl-m');
 const clS = document.getElementById('cl-s');
 const clDate = document.getElementById('cl-date');
-const colonEl = document.querySelector('.clock-time .colon');
 
 const timeFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
@@ -754,8 +759,6 @@ function updateClock() {
   clM.textContent = p.minute;
   clS.textContent = p.second;
   clDate.textContent = dateFmt.format(now);
-
-  if (colonEl) colonEl.style.opacity = (parseInt(p.second, 10) % 2) ? '0.85' : '0.35';   // soft tick
 }
 
 // ─── MUSIC (play a file in-app, eyes react to it) ────────────────────────────
@@ -867,6 +870,7 @@ mfile.addEventListener('change', (e) => { if (e.target.files[0]) MUSIC.load(e.ta
 applyMood('DEFAULT');
 bootSequence();                 // power-on the eyes (CRT turn-on)
 animLoop();
+scheduleBlink();
 idleDrift();
 setTimeout(microSaccade, 1500 + Math.random()*1000);
 setTimeout(scheduleMoodChange, 8000);
