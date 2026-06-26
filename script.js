@@ -262,11 +262,9 @@ function idleAct() {
   if (!glitching && !pointerDown && !behaviorStop && !booting &&
       pageIndex === 1 && currentMood === 'DEFAULT') {
     const r = Math.random();
-    if (r < 0.20)      winkOne(Math.random() < 0.5 ? innerL : innerR);
-    else if (r < 0.42) browFlick();
-    else if (r < 0.64) lookAround();
-    else if (r < 0.82) headTilt();
-    else { blink(70, 0, 120); setTimeout(() => { blinking = false; blink(70, 0, 120, true); }, 300); }
+    if (r < 0.40)      browFlick();
+    else if (r < 0.73) lookAround();
+    else               headTilt();
   }
   setTimeout(idleAct, 4000 + Math.random() * 5000);
 }
@@ -380,8 +378,6 @@ function applyMood(name, { scheduleNext = false } = {}) {
   if (m.gazeDown) gazeTgt.y = m.gazeDown;
   faceEl.classList.toggle('bright', !!m.bright);
 
-  if (!m.behavior) setTimeout(() => blink(), 130);
-
   if (m.behavior === 'bounce')    behaviorBounce();
   if (m.behavior === 'heartbeat') behaviorHeartbeat();
   if (m.behavior === 'dizzy')     behaviorDizzy();
@@ -448,7 +444,6 @@ function behaviorScared() {
   const id = setInterval(() => {
     gazeTgt.x = (Math.random() - 0.5) * MAX_X * 2;
     gazeTgt.y = (Math.random() - 0.5) * MAX_Y * 2;
-    if (Math.random() < 0.3) { blinking = false; blink(45, 0, 70, true); }
   }, 200);
   behaviorStop = () => { clearInterval(id); gazeTgt.x = 0; gazeTgt.y = 0; };
 }
@@ -648,7 +643,6 @@ function endPointer(e) {
       touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
     }
   } else {                                                      // was a look-drag
-    setTimeout(() => blink(60, 0, 120), 80);
     clearTimeout(touchReset);
     touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
   }
@@ -873,7 +867,6 @@ mfile.addEventListener('change', (e) => { if (e.target.files[0]) MUSIC.load(e.ta
 applyMood('DEFAULT');
 bootSequence();                 // power-on the eyes (CRT turn-on)
 animLoop();
-scheduleBlink();
 idleDrift();
 setTimeout(microSaccade, 1500 + Math.random()*1000);
 setTimeout(scheduleMoodChange, 8000);
