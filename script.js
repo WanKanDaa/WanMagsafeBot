@@ -23,19 +23,7 @@ const bodies  = document.querySelectorAll('.eye-body');
 eyeL.style.transition = 'none';
 eyeR.style.transition = 'none';
 
-// Inject bright catchlight + sheen into each eye (glassy depth, never dark)
-function addEyeDetail(eye) {
-  const mask = eye.querySelector('.eye-mask');
-  const spec = document.createElement('div'); spec.className = 'eye-spec';
-  const sheen = document.createElement('div'); sheen.className = 'eye-sheen';
-  mask.appendChild(spec);
-  mask.appendChild(sheen);
-  return spec;
-}
-const specL = addEyeDetail(eyeL);
-const specR = addEyeDetail(eyeR);
-
-// Full-screen layer for ripples / sparkles / Zzz
+// Full-screen layer for ripples / sparkles
 const fxLayer = document.createElement('div');
 fxLayer.id = 'fx-layer';
 document.body.appendChild(fxLayer);
@@ -53,8 +41,6 @@ let glitching     = false;
 let pointerDown   = false;
 let behaviorStop  = null;     // cleanup fn for active behavior
 let booting       = true;     // power-on sequence in progress
-let asleep        = false;    // standby sleep state
-let lastInteraction = performance.now();
 const T0 = performance.now();
 let prevGX = 0, prevGY = 0;   // for afterimage smear
 
@@ -128,8 +114,6 @@ const SFX = {
     this.tone({ freq: 1200, dur: 0.06, type: 'triangle', vol: 0.10, glideTo: 1900 });
     setTimeout(() => this.tone({ freq: 1700, dur: 0.06, type: 'triangle', vol: 0.07, glideTo: 2300 }), 70);
   },
-  yawnS()     { this.tone({ freq: 240, dur: 0.5, type: 'sine', vol: 0.14, glideTo: 520, attack: 0.12, release: 0.2 }); },
-  snoreS()    { this.tone({ freq: 90,  dur: 0.55, type: 'sawtooth', vol: 0.07, glideTo: 60, attack: 0.15 }); },
   browS()     { this.tone({ freq: 700, dur: 0.05, type: 'square', vol: 0.06, glideTo: 1000 }); },
 };
 
@@ -193,7 +177,7 @@ function bootSequence() {
 }
 function scheduleBlink() {
   setTimeout(() => {
-    if (!glitching && !asleep) {
+    if (!glitching) {
       blink();
       if (!MUSIC.playing) SFX.blinkS();
     }
@@ -216,18 +200,13 @@ function animLoop() {
 
   // Idle breathing — constant gentle float + scale so the face is never frozen
   const t = (performance.now() - T0) / 1000;
-  const bf = asleep ? 0.6 : 1.3;                 // breathe slower while asleep
-  const breatheY  = Math.sin(t * bf) * (asleep ? 7 : 5);
-  const breatheSc = 1 + Math.sin(t * bf) * 0.014;
+  const breatheY  = Math.sin(t * 1.3) * 5;
+  const breatheSc = 1 + Math.sin(t * 1.3) * 0.014;
 
   // Skip restyling the eyes while sliding or on the clock page (avoids repaint of a moving layer)
   if (pageIndex === 1 && !swiping) {
     eyeL.style.transform = `translate(${gaze.x}px,${gaze.y + dyL + breatheY}px) scale(${sclL * beat * breatheSc})`;
     eyeR.style.transform = `translate(${gaze.x}px,${gaze.y + dyR + breatheY}px) scale(${sclR * beat * breatheSc})`;
-
-    // Catchlight parallax — highlight drifts opposite to gaze (fakes a sphere)
-    const px = -gaze.x * 0.28, py = -gaze.y * 0.28;
-    specL.style.transform = specR.style.transform = `translate(${px}px,${py}px)`;
 
     // Afterimage smear on fast jumps
     const sp = Math.hypot(gaze.x - prevGX, gaze.y - prevGY);
@@ -244,7 +223,7 @@ function animLoop() {
 
 // ─── Idle gaze + micro-saccades ──────────────────────────────────────────────
 function idleDrift() {
-  if (!glitching && !pointerDown && !behaviorStop && !asleep) {
+  if (!glitching && !pointerDown && !behaviorStop) {
     if (Math.random() < 0.22) { gazeTgt.x = 0; gazeTgt.y = 0; }
     else {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random());
@@ -256,7 +235,7 @@ function idleDrift() {
 }
 function microSaccade() {
   // subtle, occasional dart — only sometimes, small, slow return
-  if (!glitching && !pointerDown && !behaviorStop && !asleep && Math.random() < 0.5) {
+  if (!glitching && !pointerDown && !behaviorStop && Math.random() < 0.5) {
     const ox = gazeTgt.x, oy = gazeTgt.y;
     gazeTgt.x = ox + (Math.random() - 0.5) * 3;
     gazeTgt.y = oy + (Math.random() - 0.5) * 2;
@@ -280,7 +259,7 @@ function headTilt() {
   setTimeout(() => { dyLT = 0; dyRT = 0; }, 700);
 }
 function idleAct() {
-  if (!glitching && !pointerDown && !behaviorStop && !asleep && !booting &&
+  if (!glitching && !pointerDown && !behaviorStop && !booting &&
       pageIndex === 1 && currentMood === 'DEFAULT') {
     const r = Math.random();
     if (r < 0.20)      winkOne(Math.random() < 0.5 ? innerL : innerR);
@@ -292,69 +271,13 @@ function idleAct() {
   setTimeout(idleAct, 4000 + Math.random() * 5000);
 }
 
-// ─── Sleep & wake ────────────────────────────────────────────────────────────
-const SLEEP_MS = 45000;
-let sleepTimer = null;
-
-function checkSleep() {
-  if (!asleep && !pointerDown && !MUSIC.playing && !glitching &&
-      pageIndex === 1 && performance.now() - lastInteraction > SLEEP_MS) {
-    goSleep();
-  }
-  setTimeout(checkSleep, 2000);
-}
-function goSleep() {
-  asleep = true;
-  document.body.classList.add('asleep');
-  clearTimeout(moodTimer);
-  stopBehavior();
-  currentMood = 'DEFAULT';
-  setRadius('');
-  sclLT = 1; sclRT = 1; dyLT = 0; dyRT = 0;
-  setLidTop(lidTopL, -30, 0, 900); setLidTop(lidTopR, -30, 0, 900);   // ~80% closed
-  setLidBot(lidBotL, 150); setLidBot(lidBotR, 150);
-  gazeTgt.x = 0; gazeTgt.y = 6;
-  sleepLoop();
-}
-function sleepLoop() {
-  if (!asleep) return;
-  spawnZzz();
-  SFX.snoreS();
-  gazeTgt.x = (Math.random() < 0.5 ? -1 : 1) * 6; gazeTgt.y = 6;
-  sleepTimer = setTimeout(sleepLoop, 3200 + Math.random() * 1600);
-}
-function wake() {
-  if (!asleep) return;
-  asleep = false;
-  document.body.classList.remove('asleep');
-  clearTimeout(sleepTimer);
-  setLidTop(lidTopL, -160, 0, 300); setLidTop(lidTopR, -160, 0, 300);
-  SFX.yawnS();
-  setInner('scaleY(1.18) scaleX(0.96)', 260, 'cubic-bezier(0.22,1.2,0.36,1)');   // yawn-stretch
-  setTimeout(() => squish(), 280);
-  gazeTgt.x = 0; gazeTgt.y = 0;
-  applyMood('HAPPY');
-  setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 1600);
-}
-
-// ─── FX spawners (ripple / sparkles / Zzz) ───────────────────────────────────
+// ─── FX spawners (ripple / sparkles) ─────────────────────────────────────────
 function spawnRipple(x, y) {
   const r = document.createElement('div');
   r.className = 'ripple';
   r.style.left = x + 'px'; r.style.top = y + 'px';
   fxLayer.appendChild(r);
   r.addEventListener('animationend', () => r.remove());
-}
-function spawnZzz() {
-  const z = document.createElement('div');
-  z.className = 'zzz';
-  z.textContent = 'z';
-  const rect = eyesEl.getBoundingClientRect();
-  z.style.left = (rect.right - 24) + 'px';
-  z.style.top  = (rect.top + 8) + 'px';
-  z.style.fontSize = (16 + Math.random() * 10) + 'px';
-  fxLayer.appendChild(z);
-  z.addEventListener('animationend', () => z.remove());
 }
 function spawnSparkles(n = 5) {
   const rect = eyesEl.getBoundingClientRect();
@@ -480,7 +403,6 @@ function applyMood(name, { scheduleNext = false } = {}) {
 function scheduleMoodChange() {
   clearTimeout(moodTimer);
   moodTimer = setTimeout(() => {
-    if (asleep) return;                          // don't cycle moods while sleeping
     let pick;
     do { pick = POOL[Math.floor(Math.random() * POOL.length)]; }
     while (pick === currentMood);
@@ -661,8 +583,6 @@ function lookAt(cx, cy) {
 }
 
 document.addEventListener('pointerdown', e => {
-  lastInteraction = performance.now();
-  if (asleep) wake();
   if (e.target.closest('#portrait-msg') || e.target.closest('#dots') ||
       e.target.closest('#mute') || e.target.closest('.music-controls') ||
       e.target.closest('#palette') || e.target.closest('#swatches')) return;
@@ -831,27 +751,17 @@ const dateFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Bangkok', weekday: 'long', day: 'numeric', month: 'long',
 });
 
-let prevH = '', prevM = '';
-function flipDigit(el, val) {
-  el.textContent = val;
-  el.classList.remove('flip');
-  void el.offsetWidth;          // restart the animation
-  el.classList.add('flip');
-}
-
 function updateClock() {
   if (swiping) return;   // don't repaint the glowing text mid-slide
   const now = new Date();
   const p = {};
   for (const part of timeFmt.formatToParts(now)) p[part.type] = part.value;
-  const hour = p.hour === '24' ? '00' : p.hour;   // guard against 24:00 edge
-
-  if (hour !== prevH)   { flipDigit(clH, hour);   prevH = hour; }   else clH.textContent = hour;
-  if (p.minute !== prevM) { flipDigit(clM, p.minute); prevM = p.minute; } else clM.textContent = p.minute;
+  clH.textContent = p.hour === '24' ? '00' : p.hour;   // guard against 24:00 edge
+  clM.textContent = p.minute;
   clS.textContent = p.second;
   clDate.textContent = dateFmt.format(now);
 
-  if (colonEl) colonEl.style.opacity = (parseInt(p.second, 10) % 2) ? '0.85' : '0.22';   // tick blink
+  if (colonEl) colonEl.style.opacity = (parseInt(p.second, 10) % 2) ? '0.85' : '0.35';   // soft tick
 }
 
 // ─── MUSIC (play a file in-app, eyes react to it) ────────────────────────────
@@ -968,7 +878,6 @@ idleDrift();
 setTimeout(microSaccade, 1500 + Math.random()*1000);
 setTimeout(scheduleMoodChange, 8000);
 setTimeout(idleAct, 4000 + Math.random()*3000);
-setTimeout(checkSleep, 5000);
 buildStars();
 
 updateClock();

@@ -97,21 +97,26 @@ body.music-on .eye-glow { opacity: 0.62; }
 }
 
 .clock-time {
+  position: relative;          /* anchor for the absolute seconds */
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
   font-size: min(26vw, 38vh);
   line-height: 1;
   letter-spacing: 0.005em;
   animation: clockGlow 4s ease-in-out infinite;
 }
-.clock-time .colon  { margin: 0 0.04em; opacity: 0.85; }
+.clock-time .colon { margin: 0 0.04em; opacity: 0.85; transition: opacity 0.45s ease; }
+/* Seconds are absolutely positioned so they don't push HH:MM off-center */
 .clock-time .clock-sec {
+  position: absolute;
+  left: 100%;
+  top: 0.18em;
   font-size: 0.30em;
   font-weight: 600;
   opacity: 0.55;
-  margin-left: 0.22em;
-  margin-top: 0.5em;
+  margin-left: 0.12em;
   letter-spacing: 0.04em;
 }
 
@@ -430,36 +435,6 @@ body.palette-open #swatches { opacity: 1; transform: none; pointer-events: auto;
   opacity: 0.6;
 }
 
-/* ===== CATCHLIGHT + SHEEN (bright depth, never dark) ===== */
-/* Glassy white highlight that parallax-shifts opposite to gaze (JS sets transform) */
-.eye-spec {
-  position: absolute;
-  width: 34%; height: 30%;
-  top: 16%; left: 22%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,0.6), rgba(255,255,255,0) 70%);
-  filter: blur(2px);
-  z-index: 1;
-  pointer-events: none;
-  will-change: transform;
-}
-/* Diagonal light streak that periodically sweeps across the eye */
-.eye-sheen {
-  position: absolute; inset: -25%;
-  background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,0.55) 50%, transparent 58%);
-  transform: translateX(-170%);
-  mix-blend-mode: screen;
-  z-index: 1;
-  pointer-events: none;
-  animation: sheenSweep 7s ease-in-out infinite;
-}
-#eye-right .eye-sheen { animation-delay: 0.12s; }
-@keyframes sheenSweep {
-  0%        { transform: translateX(-170%); }
-  13%       { transform: translateX(170%); }
-  13.01%,100% { transform: translateX(170%); }   /* park off-screen until next cycle */
-}
-
 /* ===== BOOT POWER-ON ===== */
 #face.boot-flicker { animation: bootFlicker 0.5s ease-out; }
 @keyframes bootFlicker {
@@ -472,10 +447,7 @@ body.palette-open #swatches { opacity: 1; transform: none; pointer-events: auto;
   100% { opacity: 1; }
 }
 
-/* ===== SLEEP ===== */
-body.asleep .eye-glow { opacity: 0.22; animation-duration: 7s; }
-
-/* ===== FX LAYER (ripples / sparkles / zzz) ===== */
+/* ===== FX LAYER (ripples / sparkles) ===== */
 #fx-layer {
   position: fixed; inset: 0;
   pointer-events: none;
@@ -508,30 +480,7 @@ body.asleep .eye-glow { opacity: 0.22; animation-duration: 7s; }
   22%  { opacity: 1; transform: translateY(-10px) scale(1); }
   100% { transform: translateY(-95px) scale(0.8); opacity: 0; }
 }
-.zzz {
-  position: absolute;
-  font-weight: 700;
-  font-family: -apple-system, system-ui, sans-serif;
-  color: var(--col);
-  text-shadow: 0 0 12px rgba(var(--glow), 0.7);
-  opacity: 0;
-  animation: zzzFloat 3.2s ease-out forwards;
-}
-@keyframes zzzFloat {
-  0%   { transform: translate(0,0) scale(0.6) rotate(-6deg); opacity: 0; }
-  20%  { opacity: 0.9; }
-  100% { transform: translate(42px,-120px) scale(1.3) rotate(8deg); opacity: 0; }
-}
-
 /* ===== CLOCK POLISH ===== */
-.clock-time { perspective: 700px; }
-.clock-time span { display: inline-block; }
-.clock-time .flip { animation: digitFlip 0.42s ease; }
-@keyframes digitFlip {
-  0%   { transform: rotateX(0deg);   opacity: 1; }
-  45%  { transform: rotateX(88deg);  opacity: 0.2; }
-  100% { transform: rotateX(0deg);   opacity: 1; }
-}
 .star {
   position: absolute;
   width: 2px; height: 2px;
@@ -546,5 +495,5 @@ body.asleep .eye-glow { opacity: 0.22; animation-duration: 7s; }
 body:not(.page-clock) .star { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
-  .eye-sheen, .star { animation: none; }
+  .star { animation: none; }
 }
