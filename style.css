@@ -1,0 +1,377 @@
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #000;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== TOKENS ===== */
+:root {
+  --ew:  min(27vw, 240px);   /* eye width  */
+  --eh:  min(40vh, 155px);   /* eye height */
+  --r:   calc(var(--eh) * 0.14);
+  --gap: min(7vw, 64px);
+}
+
+/* ===== PAGER (swipe between pages) ===== */
+#pager {
+  position: fixed; top: 0; left: 0;
+  height: 100%;
+  display: flex;
+  will-change: transform;
+}
+.page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  flex: 0 0 100vw;
+  backface-visibility: hidden;
+  touch-action: none;        /* no pan/zoom inside pages */
+}
+
+/* Controls: allow taps but no double-tap zoom */
+#mute, .music-controls button, #dots .dot { touch-action: manipulation; }
+
+/* ── Performance: pause expensive glow animations while sliding ──
+   Animating blur/text-shadow on a moving layer forces a repaint every
+   frame; freezing them lets the compositor just slide a cached bitmap. */
+body.swiping .eye-glow,
+body.swiping .eye-body,
+body.swiping .clock-time,
+body.swiping .clock-date {
+  animation-play-state: paused;
+}
+
+/* At rest, pause the page that isn't on screen (it still costs frames otherwise) */
+body:not(.page-eyes) .eye-glow {
+  animation-play-state: paused;
+}
+body:not(.page-clock) .clock-time,
+body:not(.page-clock) .clock-date {
+  animation-play-state: paused;
+}
+
+/* Eyes glow a bit brighter while music is playing */
+body.music-on .eye-glow { opacity: 0.62; }
+
+/* ===== SCENE (eyes page) ===== */
+#scene {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #000;
+  padding:
+    env(safe-area-inset-top,    0px)
+    env(safe-area-inset-right,  0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left,   0px);
+}
+
+/* ===== CLOCK PAGE ===== */
+#clock-page {
+  background: radial-gradient(ellipse at center, #0c0c14 0%, #000 72%);
+  display: flex; align-items: center; justify-content: center;
+  padding:
+    env(safe-area-inset-top,    0px)
+    env(safe-area-inset-right,  0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left,   0px);
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.6vh;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+
+.clock-time {
+  display: flex;
+  align-items: flex-start;
+  font-weight: 700;
+  font-size: min(26vw, 38vh);
+  line-height: 1;
+  letter-spacing: 0.005em;
+  animation: clockGlow 4s ease-in-out infinite;
+}
+.clock-time .colon  { margin: 0 0.04em; opacity: 0.85; }
+.clock-time .clock-sec {
+  font-size: 0.30em;
+  font-weight: 600;
+  opacity: 0.55;
+  margin-left: 0.22em;
+  margin-top: 0.5em;
+  letter-spacing: 0.04em;
+}
+
+.clock-date {
+  font-weight: 600;
+  font-size: min(4.6vw, 3.4vh);
+  letter-spacing: 0.12em;
+  opacity: 0.9;
+  text-shadow:
+    0 0 12px rgba(255,255,255,0.45),
+    0 0 30px rgba(255,255,255,0.22);
+}
+
+.clock-zone {
+  font-family: monospace;
+  font-size: min(3.2vw, 2.3vh);
+  letter-spacing: 0.34em;
+  opacity: 0.38;
+  padding-left: 0.34em;
+}
+
+@keyframes clockGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 12px rgba(255,255,255,0.70),
+      0 0 30px rgba(255,255,255,0.45),
+      0 0 60px rgba(255,255,255,0.28),
+      0 0 110px rgba(255,255,255,0.16);
+  }
+  50% {
+    text-shadow:
+      0 0 18px rgba(255,255,255,0.90),
+      0 0 44px rgba(255,255,255,0.60),
+      0 0 90px rgba(255,255,255,0.38),
+      0 0 160px rgba(255,255,255,0.22);
+  }
+}
+
+/* ===== MUSIC PAGE ===== */
+#music-page {
+  background: radial-gradient(ellipse at center, #0c0c14 0%, #000 72%);
+  display: flex; align-items: center; justify-content: center;
+  padding:
+    env(safe-area-inset-top,    0px)
+    env(safe-area-inset-right,  0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left,   0px);
+}
+.music {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3vh;
+  width: min(82vw, 640px);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+.viz {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 1.2%;
+  width: 100%;
+  height: 24vh;
+}
+.viz .bar {
+  flex: 1;
+  min-width: 3px;
+  height: 6%;
+  background: #fff;
+  border-radius: 4px 4px 2px 2px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.4);
+  transition: height 0.06s linear;
+}
+.music-title {
+  font-weight: 600;
+  font-size: min(4.6vw, 3.2vh);
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 14px rgba(255,255,255,0.3);
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.music-controls { display: flex; gap: 14px; }
+.music-controls button {
+  min-width: 64px; height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 16px; letter-spacing: 0.1em;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, opacity 0.2s;
+}
+.music-controls button:hover    { background: rgba(255,255,255,0.14); }
+.music-controls button:disabled { opacity: 0.3; cursor: default; }
+#m-play { font-size: 18px; }
+.music-hint {
+  font-family: monospace;
+  font-size: min(3vw, 2vh);
+  letter-spacing: 0.18em;
+  opacity: 0.35;
+}
+
+/* ===== PAGE DOTS ===== */
+#dots {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  left: 0; right: 0;
+  display: flex; justify-content: center; gap: 10px;
+  z-index: 60;
+  pointer-events: auto;
+}
+#dots .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+  cursor: pointer;
+}
+#dots .dot.on {
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 0 8px rgba(255,255,255,0.5);
+  transform: scale(1.15);
+}
+
+/* ===== MUTE BUTTON ===== */
+#mute {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  z-index: 60;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  color: #fff;
+  opacity: 0.35;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.25s, background 0.25s;
+}
+#mute:hover  { opacity: 0.8; }
+#mute.muted  { opacity: 0.5; }
+@media (orientation: portrait) { #mute { display: none; } }
+
+/* ===== PORTRAIT OVERLAY ===== */
+#portrait-msg {
+  display: none; position: fixed; inset: 0;
+  background: #000; color: #333;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; font-family: monospace; font-size: 14px;
+  letter-spacing: 0.1em; z-index: 100;
+}
+#portrait-msg span { font-size: 48px; display: block; animation: spin 4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (orientation: portrait) {
+  #scene        { display: none; }
+  #portrait-msg { display: flex;  }
+}
+
+/* ===== FACE (eyes + mouth stacked) ===== */
+#face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ===== EYES WRAPPER ===== */
+#eyes {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  /* JS shakes #face during glitch */
+}
+
+/* ===== EYE LAYERS =====
+   .eye        — gaze translate + per-eye scale (JS)
+   .eye-inner  — blink / squish scaleY (JS)
+   .eye-glow   — blurred ambient halo (behind, unclipped)
+   .eye-mask   — overflow-clip wrapper for body + lids
+   .eye-body   — the white rectangle
+   .lid-top    — black eyelid for angry/tired/sad/suspicious
+   .lid-bottom — black shape that carves the happy smile
+*/
+.eye {
+  position: relative;
+  width:  var(--ew);
+  height: var(--eh);
+  will-change: transform;
+  transition: transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.eye-inner {
+  position: relative;
+  width: 100%; height: 100%;
+  will-change: transform;       /* blink/squish scaleY target */
+}
+
+.eye-glow {
+  position: absolute; inset: -4%;
+  background: #fff;
+  border-radius: var(--r);
+  filter: blur(20px);
+  opacity: 0.45;
+  z-index: 0;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+.eye-mask {
+  position: absolute; inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--r);
+  transition: border-radius 0.38s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.eye-body {
+  width: 100%; height: 100%;
+  background: #fff;
+  border-radius: var(--r);
+  transition: border-radius 0.38s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* ===== EYELIDS ===== */
+/* Top lid: tall black panel that drops in and rotates to create
+   angry (inner-down) / tired (outer-down) / squint diagonals.
+   Default fully retracted above the eye. */
+.lid-top {
+  position: absolute;
+  left: -30%; right: -30%;       /* wider than eye so rotation still covers */
+  top: 0;
+  height: 160%;
+  background: #000;
+  transform: translateY(-160%);  /* hidden above */
+  transform-origin: center bottom;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Bottom lid: rounded black shape that rises to carve a smile. */
+.lid-bottom {
+  position: absolute;
+  left: -10%; right: -10%;
+  bottom: 0;
+  height: 150%;
+  background: #000;
+  border-radius: 50% 50% 0 0 / 70% 70% 0 0;
+  transform: translateY(150%);   /* hidden below */
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ===== AMBIENT PULSE ===== */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.40; }
+  50%      { opacity: 0.58; }
+}
+
+/* Brighter, faster glow when happy/excited (class on #face) */
+#face.bright .eye-glow {
+  animation-duration: 2.4s;
+  opacity: 0.6;
+}

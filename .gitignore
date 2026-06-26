@@ -1,0 +1,12 @@
+# deploy artifacts
+robot-eyes/
+_deploy/
+robot-eyes-site.zip
+.vercel/
+
+# dependencies / tooling
+node_modules/
+
+# OS junk
+.DS_Store
+Thumbs.db

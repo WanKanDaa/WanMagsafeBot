@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RoboEyes">
+  <meta name="theme-color" content="#000000">
+  <title>RoboEyes</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="pager">
+
+    <!-- PAGE 0 — Clock (revealed by swiping right) -->
+    <section class="page" id="clock-page">
+      <div class="clock">
+        <div class="clock-time">
+          <span id="cl-h">00</span><span class="colon">:</span><span id="cl-m">00</span><span class="clock-sec" id="cl-s">00</span>
+        </div>
+        <div class="clock-date" id="cl-date">—</div>
+        <div class="clock-zone">BANGKOK &middot; GMT+7</div>
+      </div>
+    </section>
+
+    <!-- PAGE 1 — Eyes (default, center) -->
+    <section class="page">
+      <div id="scene">
+        <div id="face">
+        <div id="eyes">
+
+          <div class="eye" id="eye-left">
+            <div class="eye-inner">
+              <div class="eye-glow"></div>
+              <div class="eye-mask">
+                <div class="eye-body"></div>
+                <div class="lid-top"></div>
+                <div class="lid-bottom"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="eye" id="eye-right">
+            <div class="eye-inner">
+              <div class="eye-glow"></div>
+              <div class="eye-mask">
+                <div class="eye-body"></div>
+                <div class="lid-top"></div>
+                <div class="lid-bottom"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2 — Music (revealed by swiping left) -->
+    <section class="page" id="music-page">
+      <div class="music">
+        <div class="viz" id="viz"></div>
+        <div class="music-title" id="mtitle">No track loaded</div>
+        <div class="music-controls">
+          <button id="m-load">LOAD</button>
+          <button id="m-play" disabled>&#9654;</button>
+        </div>
+        <input type="file" id="m-file" accept="audio/*" hidden>
+        <div class="music-hint">&larr; eyes dance on the next screen</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="dots">
+    <span class="dot" data-i="0"></span>
+    <span class="dot on" data-i="1"></span>
+    <span class="dot" data-i="2"></span>
+  </div>
+
+  <button id="mute" aria-label="Toggle sound">&#128266;</button>
+
+  <div id="portrait-msg">
+    <span>&#8635;</span>
+    <p>Rotate to landscape</p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

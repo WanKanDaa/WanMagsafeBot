@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RoboEyes — Icon Generator</title>
+  <style>
+    body { background:#000; color:#555; font-family:monospace; display:flex; flex-direction:column; align-items:center; padding:40px 20px; gap:24px; }
+    h1   { color:#fff; font-size:16px; letter-spacing:0.1em; }
+    p    { font-size:12px; color:#444; max-width:400px; text-align:center; line-height:1.7; }
+    .row { display:flex; gap:24px; flex-wrap:wrap; justify-content:center; align-items:flex-end; }
+    .card{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+    canvas { border:1px solid #222; }
+    label  { font-size:11px; color:#444; }
+    button {
+      background:#111; color:#fff; border:1px solid #333;
+      padding:7px 18px; cursor:pointer; font-family:monospace; font-size:12px; border-radius:3px;
+    }
+    button:hover { background:#1a1a1a; border-color:#555; }
+  </style>
+</head>
+<body>
+  <h1>ROBOEYES — ICON GENERATOR</h1>
+  <p>Open this file once in your browser, download each icon, and save it into the <strong>icons/</strong> folder.</p>
+
+  <div class="row" id="canvases"></div>
+
+  <script>
+    const SIZES = [
+      { name:'apple-touch-icon.png', size:180, label:'180×180 (Apple Touch)' },
+      { name:'icon-192.png',         size:192, label:'192×192 (PWA)'         },
+      { name:'icon-512.png',         size:512, label:'512×512 (PWA large)'   },
+    ];
+
+    function draw(canvas, size) {
+      const c = canvas.getContext('2d');
+      const s = size / 512;
+
+      // Black background
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, size, size);
+
+      // Very subtle glow beneath each eye
+      function glowEye(cx, cy, w, h) {
+        const g = c.createRadialGradient(cx, cy, 0, cx, cy, w * 0.9);
+        g.addColorStop(0, 'rgba(255,255,255,0.18)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = g;
+        c.fillRect((cx - w) * s, (cy - h) * s, w * 2 * s, h * 2 * s);
+      }
+
+      // Draw one eye (rounded rect)
+      function eye(x, y, w, h, r) {
+        const xs = x*s, ys = y*s, ws = w*s, hs = h*s, rs = r*s;
+        c.fillStyle = '#fff';
+        c.beginPath();
+        c.moveTo(xs + rs, ys);
+        c.lineTo(xs + ws - rs, ys);
+        c.quadraticCurveTo(xs + ws, ys, xs + ws, ys + rs);
+        c.lineTo(xs + ws, ys + hs - rs);
+        c.quadraticCurveTo(xs + ws, ys + hs, xs + ws - rs, ys + hs);
+        c.lineTo(xs + rs, ys + hs);
+        c.quadraticCurveTo(xs, ys + hs, xs, ys + hs - rs);
+        c.lineTo(xs, ys + rs);
+        c.quadraticCurveTo(xs, ys, xs + rs, ys);
+        c.closePath();
+        c.fill();
+      }
+
+      const ex = 60, ey = 176, ew = 168, eh = 160, er = 22;
+      const rx = 284;
+
+      glowEye(ex + ew/2, ey + eh/2, ew * 0.9, eh * 0.9);
+      glowEye(rx + ew/2, ey + eh/2, ew * 0.9, eh * 0.9);
+      eye(ex, ey, ew, eh, er);
+      eye(rx, ey, ew, eh, er);
+    }
+
+    SIZES.forEach(({ name, size, label }) => {
+      const card   = document.createElement('div');
+      card.className = 'card';
+
+      const lbl = document.createElement('label');
+      lbl.textContent = label;
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = size;
+      canvas.height = size;
+      const preview = Math.min(size, 192);
+      canvas.style.width  = preview + 'px';
+      canvas.style.height = preview + 'px';
+      draw(canvas, size);
+
+      const btn = document.createElement('button');
+      btn.textContent = `↓ ${name}`;
+      btn.onclick = () => {
+        const a = document.createElement('a');
+        a.href     = canvas.toDataURL('image/png');
+        a.download = name;
+        a.click();
+      };
+
+      card.append(lbl, canvas, btn);
+      document.getElementById('canvases').appendChild(card);
+    });
+  </script>
+</body>
+</html>
