@@ -28,6 +28,38 @@ const fxLayer = document.createElement('div');
 fxLayer.id = 'fx-layer';
 document.body.appendChild(fxLayer);
 
+// Spiral "dizzy" swirl injected into each eye (hidden until DIZZY)
+function spiralPath(cx, cy, turns, maxR, scaleX) {
+  let d = '';
+  const steps = turns * 36;
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * turns * Math.PI * 2;
+    const r = (i / steps) * maxR;
+    const x = cx + Math.cos(t) * r * scaleX;
+    const y = cy + Math.sin(t) * r;
+    d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+  }
+  return d.trim();
+}
+function buildSwirl(eye) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'eye-swirl');
+  svg.setAttribute('viewBox', '0 0 100 70');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', spiralPath(50, 35, 3.4, 33, 1.42));
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '7');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(path);
+  eye.querySelector('.eye-mask').appendChild(svg);
+}
+buildSwirl(eyeL);
+buildSwirl(eyeR);
+
 // ─── Animated state (lerped each frame) ──────────────────────────────────────
 const gaze = { x: 0, y: 0 }, gazeTgt = { x: 0, y: 0 };
 let sclL = 1, sclR = 1, sclLT = 1, sclRT = 1;        // per-eye scale
@@ -115,6 +147,10 @@ const SFX = {
     setTimeout(() => this.tone({ freq: 1700, dur: 0.06, type: 'triangle', vol: 0.07, glideTo: 2300 }), 70);
   },
   browS()     { this.tone({ freq: 700, dur: 0.05, type: 'square', vol: 0.06, glideTo: 1000 }); },
+  dizzyS()    {
+    this.tone({ freq: 300, dur: 0.26, type: 'sine', vol: 0.12, glideTo: 640 });
+    setTimeout(() => this.tone({ freq: 620, dur: 0.34, type: 'sine', vol: 0.10, glideTo: 200 }), 190);
+  },
 };
 
 try { SFX.muted = localStorage.getItem('roboMuted') === '1'; } catch (e) {}
@@ -379,6 +415,7 @@ function applyMood(name, { scheduleNext = false } = {}) {
 
   if (m.gazeDown) gazeTgt.y = m.gazeDown;
   faceEl.classList.toggle('bright', !!m.bright);
+  faceEl.classList.toggle('dizzy', name === 'DIZZY');
 
   if (!m.behavior) setTimeout(() => blink(), 130);
 
@@ -431,11 +468,12 @@ function behaviorBounce() {
   behaviorStop = () => clearInterval(id);
 }
 function behaviorDizzy() {
+  // gentle sway — the spinning spiral does most of the dizzy work
   let a = 0;
   const id = setInterval(() => {
-    a += 0.16;
-    gazeTgt.x = Math.cos(a) * MAX_X;
-    gazeTgt.y = Math.sin(a) * MAX_Y;
+    a += 0.12;
+    gazeTgt.x = Math.cos(a) * MAX_X * 0.45;
+    gazeTgt.y = Math.sin(a) * MAX_Y * 0.45;
   }, 40);
   behaviorStop = () => { clearInterval(id); gazeTgt.x = 0; gazeTgt.y = 0; };
 }
@@ -689,9 +727,61 @@ function unlockAudio() {
   SFX.init();
   SFX.resume();
   if (!SFX._booted) { SFX._booted = true; SFX.boot(); }
+  enableShake();
 }
 document.addEventListener('pointerdown', unlockAudio);
 document.addEventListener('keydown', unlockAudio);
+
+// ─── SHAKE → DIZZY ───────────────────────────────────────────────────────────
+let shakeArmed = false, dizzyCooldown = 0;
+let _sx = null, _sy = null, _sz = null, _st = 0;
+const _shakeHits = [];
+const SHAKE_THRESHOLD = 16;
+
+function triggerDizzy() {
+  const now = performance.now();
+  if (currentMood === 'DIZZY' || glitching || now - dizzyCooldown < 4000) return;
+  dizzyCooldown = now;
+  clearTimeout(moodTimer);
+  clearTimeout(touchReset);
+  applyMood('DIZZY');
+  SFX.dizzyS();
+  setTimeout(() => {
+    if (currentMood === 'DIZZY') applyMood('DEFAULT', { scheduleNext: true });
+  }, 3500);
+}
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const now = Date.now();
+  if (now - _st < 60) return;
+  _st = now;
+  if (_sx !== null) {
+    const delta = Math.abs(a.x - _sx) + Math.abs(a.y - _sy) + Math.abs(a.z - _sz);
+    if (delta > SHAKE_THRESHOLD) {
+      _shakeHits.push(now);
+      while (_shakeHits.length && now - _shakeHits[0] > 700) _shakeHits.shift();
+      if (_shakeHits.length >= 3) { _shakeHits.length = 0; triggerDizzy(); }
+    }
+  }
+  _sx = a.x; _sy = a.y; _sz = a.z;
+}
+
+function enableShake() {
+  if (shakeArmed) return;
+  shakeArmed = true;
+  const DME = window.DeviceMotionEvent;
+  if (!DME) return;
+  if (typeof DME.requestPermission === 'function') {           // iOS 13+
+    DME.requestPermission().then(state => {
+      if (state === 'granted') window.addEventListener('devicemotion', onMotion);
+    }).catch(() => {});
+  } else {
+    window.addEventListener('devicemotion', onMotion);          // Android / others
+  }
+}
+window.triggerDizzy = triggerDizzy;   // for quick testing from the console
 
 muteBtn.addEventListener('click', (e) => {
   e.stopPropagation();

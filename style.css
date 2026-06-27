@@ -388,8 +388,28 @@ body.palette-open #swatches { opacity: 1; transform: none; pointer-events: auto;
   width: 100%; height: 100%;
   background: var(--col);
   border-radius: var(--r);
-  transition: border-radius 0.42s cubic-bezier(0.33, 0, 0.2, 1);
+  transition: border-radius 0.42s cubic-bezier(0.33, 0, 0.2, 1), opacity 0.25s ease;
 }
+
+/* ===== DIZZY SPIRAL ===== */
+/* Spiral swirl that replaces the solid fill while dizzy (clipped to eye shape) */
+.eye-swirl {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  color: var(--col);
+  opacity: 0;
+  z-index: 1;            /* above body, below lids */
+  pointer-events: none;
+  transform-origin: center;
+  transition: opacity 0.25s ease;
+}
+#face.dizzy .eye-body  { opacity: 0; }
+#face.dizzy .eye-swirl { opacity: 1; }
+#face.dizzy .eye-glow  { opacity: 0.4; }
+#face.dizzy #eye-left  .eye-swirl { animation: swirlSpin 1.1s linear infinite; }
+#face.dizzy #eye-right .eye-swirl { animation: swirlSpin 1.1s linear infinite reverse; }
+@keyframes swirlSpin { to { transform: rotate(360deg); } }
 
 /* ===== EYELIDS ===== */
 /* Top lid: tall black panel that drops in and rotates to create
