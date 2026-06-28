@@ -28,18 +28,6 @@ const fxLayer = document.createElement('div');
 fxLayer.id = 'fx-layer';
 document.body.appendChild(fxLayer);
 
-// Small status toast (used for shake/motion feedback)
-const toastEl = document.createElement('div');
-toastEl.id = 'toast';
-document.body.appendChild(toastEl);
-let _toastTimer = null;
-function toast(msg, ms = 2200) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
-}
-
 // Spiral "dizzy" swirl injected into each eye (hidden until DIZZY)
 function spiralPath(cx, cy, turns, maxR, scaleX) {
   let d = '';
@@ -159,10 +147,6 @@ const SFX = {
     setTimeout(() => this.tone({ freq: 1700, dur: 0.06, type: 'triangle', vol: 0.07, glideTo: 2300 }), 70);
   },
   browS()     { this.tone({ freq: 700, dur: 0.05, type: 'square', vol: 0.06, glideTo: 1000 }); },
-  dizzyS()    {
-    this.tone({ freq: 300, dur: 0.26, type: 'sine', vol: 0.12, glideTo: 640 });
-    setTimeout(() => this.tone({ freq: 620, dur: 0.34, type: 'sine', vol: 0.10, glideTo: 200 }), 190);
-  },
 };
 
 try { SFX.muted = localStorage.getItem('roboMuted') === '1'; } catch (e) {}
@@ -739,63 +723,10 @@ function unlockAudio() {
   SFX.init();
   SFX.resume();
   if (!SFX._booted) { SFX._booted = true; SFX.boot(); }
-  enableShake();
 }
 document.addEventListener('pointerdown', unlockAudio);
 document.addEventListener('keydown', unlockAudio);
 
-// ─── SHAKE → DIZZY ───────────────────────────────────────────────────────────
-let shakeArmed = false, dizzyCooldown = 0, _motionSeen = false;
-let _sx = null, _sy = null, _sz = null, _st = 0;
-const _shakeHits = [];
-const SHAKE_THRESHOLD = 13;
-
-function triggerDizzy() {
-  const now = performance.now();
-  if (currentMood === 'DIZZY' || glitching || now - dizzyCooldown < 4000) return;
-  dizzyCooldown = now;
-  clearTimeout(moodTimer);
-  clearTimeout(touchReset);
-  applyMood('DIZZY');
-  SFX.dizzyS();
-  setTimeout(() => {
-    if (currentMood === 'DIZZY') applyMood('DEFAULT', { scheduleNext: true });
-  }, 3500);
-}
-
-function onMotion(e) {
-  const a = e.accelerationIncludingGravity || e.acceleration;
-  if (!a || a.x == null) return;
-  if (!_motionSeen) { _motionSeen = true; toast('motion on — shake me! 🤳'); }
-  const now = Date.now();
-  if (now - _st < 50) return;
-  _st = now;
-  if (_sx !== null) {
-    const delta = Math.abs(a.x - _sx) + Math.abs(a.y - _sy) + Math.abs(a.z - _sz);
-    if (delta > SHAKE_THRESHOLD) {
-      _shakeHits.push(now);
-      while (_shakeHits.length && now - _shakeHits[0] > 800) _shakeHits.shift();
-      if (_shakeHits.length >= 2) { _shakeHits.length = 0; triggerDizzy(); }
-    }
-  }
-  _sx = a.x; _sy = a.y; _sz = a.z;
-}
-
-function enableShake() {
-  if (shakeArmed) return;
-  shakeArmed = true;
-  const DME = window.DeviceMotionEvent;
-  if (!DME) { toast('no motion sensor here'); return; }
-  if (typeof DME.requestPermission === 'function') {           // iOS 13+
-    DME.requestPermission().then(state => {
-      if (state === 'granted') { window.addEventListener('devicemotion', onMotion); toast('shake enabled ✓'); }
-      else { shakeArmed = false; toast('motion blocked — tap again to allow'); }
-    }).catch(() => { shakeArmed = false; toast('open in Safari for shake'); });
-  } else {
-    window.addEventListener('devicemotion', onMotion);          // Android / others
-  }
-}
-window.triggerDizzy = triggerDizzy;   // for quick testing from the console
 
 muteBtn.addEventListener('click', (e) => {
   e.stopPropagation();
