@@ -20,6 +20,9 @@ html, body {
   --gap: min(8vw, 90px);
   --col:  #ffffff;           /* theme color (eyes/clock/glow) */
   --glow: 255,255,255;       /* rgb for rgba() glow shadows */
+  --nova-grad-light: #d9ffff;
+  --nova-grad-mid:   #6af7ff;
+  --nova-grad-dark:  #00b7de;
 }
 
 /* ===== PAGER (swipe between pages) ===== */
@@ -40,13 +43,14 @@ html, body {
 }
 
 /* Controls: allow taps but no double-tap zoom */
-#mute, .music-controls button, #dots .dot { touch-action: manipulation; }
+#mute, #eye-style-toggle button, .music-controls button, #dots .dot { touch-action: manipulation; }
 
 /* ── Performance: pause expensive glow animations while sliding ──
    Animating blur/text-shadow on a moving layer forces a repaint every
    frame; freezing them lets the compositor just slide a cached bitmap. */
 body.swiping .eye-glow,
 body.swiping .eye-body,
+body.swiping #nova-eyes *,
 body.swiping .clock-time,
 body.swiping .clock-date {
   animation-play-state: paused;
@@ -54,6 +58,12 @@ body.swiping .clock-date {
 
 /* At rest, pause the page that isn't on screen (it still costs frames otherwise) */
 body:not(.page-eyes) .eye-glow {
+  animation-play-state: paused;
+}
+body:not(.page-eyes) #nova-eyes *,
+body[data-eye-style="classic"] #nova-eyes *,
+body[data-eye-style="nova"] .eye-glow,
+body[data-eye-style="nova"] .eye-swirl {
   animation-play-state: paused;
 }
 body:not(.page-clock) .clock-time,
@@ -261,6 +271,65 @@ body.music-on .eye-glow { opacity: 0.62; }
 #mute.muted  { opacity: 0.5; }
 @media (orientation: portrait) { #mute { display: none; } }
 
+/* ===== EYE STYLE TOGGLE ===== */
+#eye-style-toggle {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 999px;
+  background: rgba(5,5,8,0.72);
+  box-shadow: 0 8px 26px rgba(0,0,0,0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -7px) scale(0.97);
+  transition:
+    opacity 0.18s ease,
+    transform 0.24s cubic-bezier(0.16,1,0.3,1);
+}
+
+body.page-eyes:not(.swiping) #eye-style-toggle {
+  opacity: 0.46;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+body.page-eyes #eye-style-toggle:hover,
+body.page-eyes #eye-style-toggle:focus-within { opacity: 1; }
+
+.eye-style-option {
+  min-width: 68px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255,255,255,0.48);
+  background: transparent;
+  font: 600 9px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s ease;
+}
+
+.eye-style-option:active { transform: scale(0.95); }
+.eye-style-option.active {
+  color: #000;
+  background: var(--col);
+  box-shadow: 0 0 14px rgba(var(--glow),0.42);
+}
+
+@media (orientation: portrait) { #eye-style-toggle { display: none; } }
+
 /* ===== PALETTE (color picker) ===== */
 #palette {
   position: fixed;
@@ -330,9 +399,11 @@ body.palette-open #swatches { opacity: 1; transform: none; pointer-events: auto;
 
 /* ===== FACE (eyes + mouth stacked) ===== */
 #face {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
 /* ===== EYES WRAPPER ===== */
@@ -340,7 +411,181 @@ body.palette-open #swatches { opacity: 1; transform: none; pointer-events: auto;
   display: flex;
   align-items: center;
   gap: var(--gap);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.16s ease, visibility 0s linear;
   /* JS shakes #face during glitch */
+}
+
+body[data-eye-style="nova"] #eyes {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+
+/* ===== NOVA EYE RENDERER =====
+   Three nested transform layers keep shared motion independent:
+   motion = gaze/breath/music, blink = blink/wink/warp, expression = mood. */
+#nova-eyes {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: calc(var(--ew) * 2 + var(--gap));
+  height: var(--eh);
+  overflow: visible;
+  color: var(--col);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.97);
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.16,1,0.3,1),
+    visibility 0s linear 0.18s;
+}
+
+body[data-eye-style="nova"] #nova-eyes {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.16,1,0.3,1),
+    visibility 0s linear;
+}
+
+.nova-eye-motion,
+.nova-eye-blink,
+.nova-eye-settle,
+.nova-eye-expression,
+.nova-eye-visual {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.nova-eye-expression {
+  transition: transform 0.30s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+.nova-eye-right-expression { transition-delay: 24ms; }
+
+.nova-gradient-light { stop-color: var(--nova-grad-light); }
+.nova-gradient-mid   { stop-color: var(--nova-grad-mid); }
+.nova-gradient-dark  { stop-color: var(--nova-grad-dark); }
+.nova-gradient-light,
+.nova-gradient-mid,
+.nova-gradient-dark { transition: stop-color 0.25s ease; }
+
+.nova-eye-visual {
+  filter:
+    drop-shadow(0 0 8px rgba(var(--glow),0.95))
+    drop-shadow(0 0 22px rgba(var(--glow),0.52));
+  transition:
+    opacity 0.15s ease,
+    transform 0.26s cubic-bezier(0.175,0.885,0.32,1.275),
+    filter 0.25s ease;
+}
+
+.nova-eye-normal { opacity: 1; transform: scale(1); }
+.nova-eye-smile,
+.nova-eye-heart,
+.nova-eye-cross { opacity: 0; transform: scale(0.74); }
+
+.nova-eye-shape,
+.nova-eye-smile,
+.nova-eye-heart { fill: url(#nova-eye-gradient); }
+
+.nova-eye-shape {
+  transition: rx 0.28s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+
+.nova-eye-cross {
+  fill: none;
+  stroke: url(#nova-eye-gradient);
+  stroke-width: 30;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Independent eight-expression NOVA engine. */
+#nova-eyes[data-expression="happy"] .nova-eye-normal { opacity: 0; transform: scale(0.78); }
+#nova-eyes[data-expression="happy"] .nova-eye-smile { opacity: 1; transform: scale(1); }
+#nova-eyes[data-expression="happy"] .nova-eye-left-expression { transform: translateY(-4px) rotate(-2deg); }
+#nova-eyes[data-expression="happy"] .nova-eye-right-expression { transform: translateY(-4px) rotate(2deg); }
+
+#nova-eyes[data-expression="curious"] .nova-eye-left-expression { transform: translate(-8px,8px) scale(1.08); }
+#nova-eyes[data-expression="curious"] .nova-eye-right-expression { transform: translate(5px,-26px) rotate(7deg) scale(0.72); }
+
+#nova-eyes[data-expression="surprised"] .nova-eye-left-expression { transform: translateX(20px) scale(0.74,1.18); }
+#nova-eyes[data-expression="surprised"] .nova-eye-right-expression { transform: translateX(-20px) scale(0.74,1.18); }
+#nova-eyes[data-expression="surprised"] .nova-eye-shape { rx: 124px; }
+
+#nova-eyes[data-expression="sleepy"] .nova-eye-left-expression { transform: translateY(22px) rotate(3deg) scaleY(0.38); }
+#nova-eyes[data-expression="sleepy"] .nova-eye-right-expression { transform: translateY(22px) rotate(-3deg) scaleY(0.38); }
+
+#nova-eyes[data-expression="angry"] .nova-eye-left-expression { transform: translate(12px,12px) rotate(14deg) scale(1.05,0.72); }
+#nova-eyes[data-expression="angry"] .nova-eye-right-expression { transform: translate(-12px,12px) rotate(-14deg) scale(1.05,0.72); }
+#nova-eyes[data-expression="angry"] .nova-eye-shape { rx: 42px; }
+
+#nova-eyes[data-expression="love"] .nova-eye-normal { opacity: 0; transform: scale(0.76); }
+#nova-eyes[data-expression="love"] .nova-eye-heart { opacity: 1; transform: scale(1); }
+#nova-eyes[data-expression="love"] .nova-eye-left-expression { transform: translateY(-2px) rotate(-4deg); }
+#nova-eyes[data-expression="love"] .nova-eye-right-expression { transform: translateY(-2px) rotate(4deg); }
+
+#nova-eyes[data-expression="dizzy"] .nova-eye-normal { opacity: 0; transform: scale(0.72); }
+#nova-eyes[data-expression="dizzy"] .nova-eye-cross {
+  opacity: 1;
+  transform: scale(0.96);
+  animation: nova-dizzy-wobble 1.1s ease-in-out infinite alternate;
+}
+#nova-eyes[data-expression="dizzy"] .nova-eye-left-expression { transform: rotate(-7deg) scale(0.9); }
+#nova-eyes[data-expression="dizzy"] .nova-eye-right-expression { transform: rotate(8deg) scale(0.9); }
+
+#nova-eyes[data-expression="happy"] .nova-eye-visual,
+#nova-eyes[data-expression="love"] .nova-eye-visual,
+body.music-on #nova-eyes .nova-eye-visual {
+  filter:
+    drop-shadow(0 0 9px rgba(var(--glow),1))
+    drop-shadow(0 0 28px rgba(var(--glow),0.72));
+}
+
+.nova-glitch-bars {
+  fill: var(--nova-grad-mid);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#nova-eyes.nova-expression-change .nova-eye-settle {
+  animation: nova-expression-settle 0.33s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+#nova-eyes.nova-glitch .nova-glitch-bars {
+  animation: nova-glitch-flash 0.18s steps(2,jump-none) both;
+}
+#nova-eyes.nova-glitch .nova-eye-motion {
+  animation: nova-glitch-jump 0.18s steps(2,jump-none) both;
+}
+
+@keyframes nova-expression-settle {
+  0%   { transform: scale(0.96); }
+  55%  { transform: scale(1.014); }
+  100% { transform: scale(1); }
+}
+
+@keyframes nova-dizzy-wobble {
+  from { transform: scale(0.92) rotate(-7deg); }
+  to   { transform: scale(1.03) rotate(7deg); }
+}
+
+@keyframes nova-glitch-flash {
+  0%   { opacity: 0; transform: translateX(-16px); }
+  35%  { opacity: 0.6; }
+  70%  { opacity: 0.25; transform: translateX(18px); }
+  100% { opacity: 0; }
+}
+
+@keyframes nova-glitch-jump {
+  0%, 100% { translate: 0 0; }
+  32%      { translate: 12px -4px; }
+  68%      { translate: -9px 5px; }
 }
 
 /* ===== EYE LAYERS =====

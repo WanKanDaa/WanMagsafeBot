@@ -1,4 +1,4 @@
-const CACHE = 'robot-face-v6';
+const CACHE = 'robot-face-v8';
 const CORE  = ['./', './index.html', './style.css', './script.js', './manifest.json'];
 
 self.addEventListener('install', (e) => {

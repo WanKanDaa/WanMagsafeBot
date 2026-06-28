@@ -56,6 +56,59 @@
           </div>
 
         </div>
+
+        <!-- Alternate NOVA renderer. The original #eyes DOM remains untouched. -->
+        <svg id="nova-eyes" data-expression="neutral" viewBox="0 0 800 300" preserveAspectRatio="none" role="img" aria-labelledby="nova-eyes-title nova-eyes-desc">
+          <title id="nova-eyes-title">NOVA animated robot eyes</title>
+          <desc id="nova-eyes-desc">Two gradient robot eyes cycling through eight expressive animations.</desc>
+          <defs>
+            <linearGradient id="nova-eye-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop class="nova-gradient-light" offset="0" />
+              <stop class="nova-gradient-mid" offset="0.38" />
+              <stop class="nova-gradient-dark" offset="1" />
+            </linearGradient>
+          </defs>
+
+          <g class="nova-eye-motion" id="nova-eye-left-motion">
+            <g class="nova-eye-blink" id="nova-eye-left-blink">
+              <g class="nova-eye-settle">
+                <g class="nova-eye-expression nova-eye-left-expression">
+                  <g class="nova-eye-visual nova-eye-normal">
+                    <rect class="nova-eye-shape" x="82" y="70" width="248" height="160" rx="68" />
+                  </g>
+                  <path class="nova-eye-visual nova-eye-smile" d="M88 130 Q206 268 324 130 Q314 252 206 258 Q98 252 88 130Z" />
+                  <path class="nova-eye-visual nova-eye-heart" d="M206 244 C179 210 106 178 106 116 C106 69 170 52 206 99 C242 52 306 69 306 116 C306 178 233 210 206 244Z" />
+                  <g class="nova-eye-visual nova-eye-cross">
+                    <path d="M118 91 L294 221 M294 91 L118 221" />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+
+          <g class="nova-eye-motion" id="nova-eye-right-motion">
+            <g class="nova-eye-blink" id="nova-eye-right-blink">
+              <g class="nova-eye-settle">
+                <g class="nova-eye-expression nova-eye-right-expression">
+                  <g class="nova-eye-visual nova-eye-normal">
+                    <rect class="nova-eye-shape" x="470" y="70" width="248" height="160" rx="68" />
+                  </g>
+                  <path class="nova-eye-visual nova-eye-smile" d="M476 130 Q594 268 712 130 Q702 252 594 258 Q486 252 476 130Z" />
+                  <path class="nova-eye-visual nova-eye-heart" d="M594 244 C567 210 494 178 494 116 C494 69 558 52 594 99 C630 52 694 69 694 116 C694 178 621 210 594 244Z" />
+                  <g class="nova-eye-visual nova-eye-cross">
+                    <path d="M506 91 L682 221 M682 91 L506 221" />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+
+          <g class="nova-glitch-bars" aria-hidden="true">
+            <rect x="54" y="72" width="692" height="7" />
+            <rect x="108" y="184" width="586" height="11" />
+            <rect x="260" y="246" width="332" height="5" />
+          </g>
+        </svg>
         </div>
       </div>
     </section>
@@ -83,6 +136,11 @@
   </div>
 
   <button id="mute" aria-label="Toggle sound"></button>
+
+  <div id="eye-style-toggle" role="group" aria-label="Choose eye style">
+    <button class="eye-style-option active" type="button" data-eye-style="classic" aria-pressed="true">ORIGINAL</button>
+    <button class="eye-style-option" type="button" data-eye-style="nova" aria-pressed="false">NOVA</button>
+  </div>
 
   <button id="palette" aria-label="Change color">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

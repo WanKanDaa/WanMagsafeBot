@@ -19,6 +19,16 @@ const lidBotR = eyeR.querySelector('.lid-bottom');
 const masks   = document.querySelectorAll('.eye-mask');
 const bodies  = document.querySelectorAll('.eye-body');
 
+// Alternate NOVA renderer. The original renderer remains the source of truth;
+// NOVA consumes the same mood, gaze, blink, beat, and gesture state.
+const novaEyes    = document.getElementById('nova-eyes');
+const novaMotionL = document.getElementById('nova-eye-left-motion');
+const novaMotionR = document.getElementById('nova-eye-right-motion');
+const novaBlinkL  = document.getElementById('nova-eye-left-blink');
+const novaBlinkR  = document.getElementById('nova-eye-right-blink');
+const novaBlinks  = [novaBlinkL, novaBlinkR];
+const eyeStyleButtons = Array.from(document.querySelectorAll('.eye-style-option'));
+
 // .eye wrappers are driven entirely by JS lerp — kill CSS transition
 eyeL.style.transition = 'none';
 eyeR.style.transition = 'none';
@@ -73,10 +83,94 @@ let glitching     = false;
 let pointerDown   = false;
 let behaviorStop  = null;     // cleanup fn for active behavior
 let booting       = true;     // power-on sequence in progress
+let activeEyeStyle = 'classic';
+const NOVA_EXPRESSIONS = ['neutral','happy','curious','surprised','sleepy','angry','love','dizzy'];
+let novaExpression = 'neutral';
+let novaAutoTimer = null;
+let novaAnimationToken = 0;
 const T0 = performance.now();
 let prevGX = 0, prevGY = 0;   // for afterimage smear
 
 const MAX_X = 30, MAX_Y = 15;
+
+function setNovaExpression(expression, { animate = true } = {}) {
+  if (!NOVA_EXPRESSIONS.includes(expression)) return;
+  novaExpression = expression;
+  novaAnimationToken += 1;
+  const token = novaAnimationToken;
+
+  novaEyes.classList.remove('nova-expression-change', 'nova-glitch');
+  if (animate) {
+    void novaEyes.getBoundingClientRect();
+    novaEyes.classList.add('nova-expression-change');
+    if (expression === 'dizzy') novaEyes.classList.add('nova-glitch');
+  }
+  novaEyes.dataset.expression = expression;
+
+  setTimeout(() => {
+    if (novaAnimationToken === token)
+      novaEyes.classList.remove('nova-expression-change', 'nova-glitch');
+  }, 360);
+}
+
+function advanceNovaExpression() {
+  const index = NOVA_EXPRESSIONS.indexOf(novaExpression);
+  setNovaExpression(NOVA_EXPRESSIONS[(index + 1) % NOVA_EXPRESSIONS.length]);
+}
+
+function stopNovaAutoplay() {
+  clearInterval(novaAutoTimer);
+  novaAutoTimer = null;
+}
+
+function startNovaAutoplay() {
+  stopNovaAutoplay();
+  if (activeEyeStyle !== 'nova' || pageIndex !== 1 || swiping) return;
+  novaAutoTimer = setInterval(advanceNovaExpression, 3400);
+}
+
+function syncEyeEngine() {
+  if (activeEyeStyle === 'nova' && pageIndex === 1 && !swiping) startNovaAutoplay();
+  else stopNovaAutoplay();
+}
+
+function setEyeStyle(style, { persist = true } = {}) {
+  const next = style === 'nova' ? 'nova' : 'classic';
+  activeEyeStyle = next;
+  document.body.dataset.eyeStyle = next;
+  eyeStyleButtons.forEach(button => {
+    const selected = button.dataset.eyeStyle === next;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+
+  // Avoid a one-frame smear when changing which renderer receives gaze updates.
+  innerL.style.filter = innerR.style.filter = '';
+  novaBlinkL.style.filter = novaBlinkR.style.filter = '';
+  prevGX = gaze.x; prevGY = gaze.y;
+
+  clearTimeout(touchReset);
+  if (next === 'nova') {
+    clearTimeout(moodTimer);
+    moodTimer = null;
+    applyMood('DEFAULT');
+    setNovaExpression(novaExpression, { animate: false });
+    syncEyeEngine();
+  } else {
+    stopNovaAutoplay();
+    applyMood('DEFAULT', { scheduleNext: true });
+  }
+
+  if (persist) {
+    try { localStorage.setItem('roboEyeStyle', next); } catch (e) {}
+  }
+}
+
+eyeStyleButtons.forEach(button => button.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setEyeStyle(button.dataset.eyeStyle);
+  SFX.tapS();
+}));
 
 // ─── SFX (procedural Web Audio — no files) ───────────────────────────────────
 const SFX = {
@@ -153,14 +247,19 @@ try { SFX.muted = localStorage.getItem('roboMuted') === '1'; } catch (e) {}
 
 // ─── Low-level transform helpers ─────────────────────────────────────────────
 function setInner(transform, ms, ease = 'ease-out') {
-  inners.forEach(el => {
+  [...inners, ...novaBlinks].forEach(el => {
     el.style.transition = `transform ${ms}ms ${ease}`;
     el.style.transform  = transform;
   });
 }
 function setInnerOne(el, transform, ms, ease = 'ease-out') {
-  el.style.transition = `transform ${ms}ms ${ease}`;
-  el.style.transform  = transform;
+  const pair = el === innerL || el === novaBlinkL
+    ? [innerL, novaBlinkL]
+    : [innerR, novaBlinkR];
+  pair.forEach(layer => {
+    layer.style.transition = `transform ${ms}ms ${ease}`;
+    layer.style.transform  = transform;
+  });
 }
 function setLidTop(el, y, rot, ms = 420) {
   el.style.transition = `transform ${ms}ms cubic-bezier(0.34,1.2,0.64,1)`;
@@ -178,9 +277,10 @@ function setRadius(css) {
 
 // ─── BLINK (smooth scaleY collapse) ──────────────────────────────────────────
 function blink(closeMs = 95, holdMs = 28, openMs = 185, force = false) {
-  if (blinking || booting) return;
+  if (blinking || booting) return false;
+  if (!force && activeEyeStyle === 'nova' && ['happy','love','dizzy'].includes(novaExpression)) return false;
   const now = performance.now();
-  if (!force && now - lastBlink < 650) return;   // min gap → no fluttering
+  if (!force && now - lastBlink < 650) return false;   // min gap → no fluttering
   lastBlink = now;
   blinking = true;
   setInner('scaleY(0.03)', closeMs, 'cubic-bezier(0.55,0,0.75,0.4)');  // smooth close
@@ -188,6 +288,7 @@ function blink(closeMs = 95, holdMs = 28, openMs = 185, force = false) {
     setInner('scaleY(1)', openMs, 'cubic-bezier(0.16,1,0.3,1)');       // gentle settle, no overshoot
     setTimeout(() => { blinking = false; }, openMs + 20);
   }, closeMs + holdMs);
+  return true;
 }
 function winkOne(el, closeMs = 80, openMs = 165) {
   SFX.winkS();
@@ -210,8 +311,8 @@ function bootSequence() {
 function scheduleBlink() {
   setTimeout(() => {
     if (!glitching) {
-      blink();
-      if (!MUSIC.playing) SFX.blinkS();
+      const didBlink = blink();
+      if (didBlink && !MUSIC.playing) SFX.blinkS();
     }
     scheduleBlink();
   }, 2400 + Math.random() * 4200);
@@ -237,16 +338,26 @@ function animLoop() {
 
   // Skip restyling the eyes while sliding or on the clock page (avoids repaint of a moving layer)
   if (pageIndex === 1 && !swiping) {
-    eyeL.style.transform = `translate(${gaze.x}px,${gaze.y + dyL + breatheY}px) scale(${sclL * beat * breatheSc})`;
-    eyeR.style.transform = `translate(${gaze.x}px,${gaze.y + dyR + breatheY}px) scale(${sclR * beat * breatheSc})`;
+    const transformL = `translate(${gaze.x}px,${gaze.y + dyL + breatheY}px) scale(${sclL * beat * breatheSc})`;
+    const transformR = `translate(${gaze.x}px,${gaze.y + dyR + breatheY}px) scale(${sclR * beat * breatheSc})`;
+
+    if (activeEyeStyle === 'nova') {
+      novaMotionL.style.transform = transformL;
+      novaMotionR.style.transform = transformR;
+    } else {
+      eyeL.style.transform = transformL;
+      eyeR.style.transform = transformR;
+    }
 
     // Afterimage smear on fast jumps
     const sp = Math.hypot(gaze.x - prevGX, gaze.y - prevGY);
+    const blurL = activeEyeStyle === 'nova' ? novaBlinkL : innerL;
+    const blurR = activeEyeStyle === 'nova' ? novaBlinkR : innerR;
     if (sp > 6) {
       const b = Math.min(sp * 0.5, 7);
-      innerL.style.filter = innerR.style.filter = `blur(${b}px)`;
-    } else if (innerL.style.filter) {
-      innerL.style.filter = innerR.style.filter = '';
+      blurL.style.filter = blurR.style.filter = `blur(${b}px)`;
+    } else if (blurL.style.filter) {
+      blurL.style.filter = blurR.style.filter = '';
     }
   }
   prevGX = gaze.x; prevGY = gaze.y;
@@ -291,7 +402,7 @@ function headTilt() {
   setTimeout(() => { dyLT = 0; dyRT = 0; }, 700);
 }
 function idleAct() {
-  if (!glitching && !pointerDown && !behaviorStop && !booting &&
+  if (activeEyeStyle === 'classic' && !glitching && !pointerDown && !behaviorStop && !booting &&
       pageIndex === 1 && currentMood === 'DEFAULT') {
     const r = Math.random();
     if (r < 0.20)      winkOne(Math.random() < 0.5 ? innerL : innerR);
@@ -391,6 +502,7 @@ function stopBehavior() {
 }
 
 function applyMood(name, { scheduleNext = false } = {}) {
+  if (activeEyeStyle === 'nova' && name !== 'DEFAULT') return;
   const m = MOODS[name] || {};
   currentMood = name;
 
@@ -435,7 +547,15 @@ function applyMood(name, { scheduleNext = false } = {}) {
 
 function scheduleMoodChange() {
   clearTimeout(moodTimer);
+  if (activeEyeStyle !== 'classic') {
+    moodTimer = null;
+    return;
+  }
   moodTimer = setTimeout(() => {
+    if (activeEyeStyle !== 'classic') {
+      moodTimer = null;
+      return;
+    }
     let pick;
     do { pick = POOL[Math.floor(Math.random() * POOL.length)]; }
     while (pick === currentMood);
@@ -587,11 +707,13 @@ function updatePageClass() {
   document.body.classList.toggle('page-clock', pageIndex === 0);
   document.body.classList.toggle('page-eyes',  pageIndex === 1);
   document.body.classList.toggle('page-music', pageIndex === 2);
+  syncEyeEngine();
 }
 function setSwiping(v) {
   if (swiping === v) return;
   swiping = v;
   document.body.classList.toggle('swiping', v);
+  syncEyeEngine();
 }
 function snapTo(i) {
   const target = Math.max(0, Math.min(PAGES - 1, i));
@@ -619,7 +741,8 @@ function lookAt(cx, cy) {
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('#portrait-msg') || e.target.closest('#dots') ||
       e.target.closest('#mute') || e.target.closest('.music-controls') ||
-      e.target.closest('#palette') || e.target.closest('#swatches')) return;
+      e.target.closest('#palette') || e.target.closest('#swatches') ||
+      e.target.closest('#eye-style-toggle')) return;
   pointerDown = true;
   gx = e.clientX; gy = e.clientY; gt = Date.now(); gMode = null;
   longPress = setTimeout(() => {              // long-press → wink (eyes page only)
@@ -668,23 +791,31 @@ function endPointer(e) {
       lastTap = 0;
       SFX.surprised();
       spawnRipple(e.clientX, e.clientY);
-      applyMood('SURPRISED'); squish();
-      clearTimeout(touchReset);
-      touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 2500);
+      squish();
+      if (activeEyeStyle === 'classic') {
+        applyMood('SURPRISED');
+        clearTimeout(touchReset);
+        touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 2500);
+      }
     } else {                                                    // single tap → look + HAPPY
       lastTap = now;
       SFX.tapS();
       SFX.rippleS();
       spawnRipple(e.clientX, e.clientY);
       lookAt(e.clientX, e.clientY);          // glide toward the tap (no instant snap)
-      squish(); applyMood('HAPPY');
-      clearTimeout(touchReset);
-      touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
+      squish();
+      if (activeEyeStyle === 'classic') {
+        applyMood('HAPPY');
+        clearTimeout(touchReset);
+        touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
+      }
     }
   } else {                                                      // was a look-drag
     setTimeout(() => blink(60, 0, 120), 80);
-    clearTimeout(touchReset);
-    touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
+    if (activeEyeStyle === 'classic') {
+      clearTimeout(touchReset);
+      touchReset = setTimeout(() => applyMood('DEFAULT', { scheduleNext: true }), 4500);
+    }
   }
 }
 document.addEventListener('pointerup', endPointer);
@@ -742,9 +873,40 @@ updateMuteIcon();
 const paletteBtn = document.getElementById('palette');
 const swatchEls  = Array.from(document.querySelectorAll('.sw'));
 
+function parseHexColor(hex) {
+  let value = String(hex || '').trim().replace('#', '');
+  if (value.length === 3) value = value.split('').map(ch => ch + ch).join('');
+  if (!/^[0-9a-f]{6}$/i.test(value)) return null;
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function mixHexColor(from, to, amount) {
+  const a = parseHexColor(from), b = parseHexColor(to);
+  if (!a || !b) return from;
+  const channel = key => Math.round(a[key] + (b[key] - a[key]) * amount)
+    .toString(16).padStart(2, '0');
+  return `#${channel('r')}${channel('g')}${channel('b')}`;
+}
+
+function applyNovaGradient(col) {
+  const normalized = String(col).toLowerCase();
+  const isWhite = normalized === '#fff' || normalized === '#ffffff';
+  const light = isWhite ? '#d9ffff' : mixHexColor(col, '#ffffff', 0.65);
+  const mid   = isWhite ? '#6af7ff' : col;
+  const dark  = isWhite ? '#00b7de' : mixHexColor(col, '#000000', 0.28);
+  document.documentElement.style.setProperty('--nova-grad-light', light);
+  document.documentElement.style.setProperty('--nova-grad-mid', mid);
+  document.documentElement.style.setProperty('--nova-grad-dark', dark);
+}
+
 function applyColor(col, glow, save = true) {
   document.documentElement.style.setProperty('--col', col);
   document.documentElement.style.setProperty('--glow', glow);
+  applyNovaGradient(col);
   swatchEls.forEach(s => s.classList.toggle('active', s.dataset.col.toLowerCase() === col.toLowerCase()));
   if (save) { try { localStorage.setItem('roboColor', JSON.stringify({ col, glow })); } catch (e) {} }
 }
@@ -902,13 +1064,16 @@ mplay.addEventListener('click', (e) => { e.stopPropagation(); MUSIC.toggle(); })
 mfile.addEventListener('change', (e) => { if (e.target.files[0]) MUSIC.load(e.target.files[0]); });
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
-applyMood('DEFAULT');
+try {
+  setEyeStyle(localStorage.getItem('roboEyeStyle') || 'classic', { persist: false });
+} catch (e) {
+  setEyeStyle('classic', { persist: false });
+}
 bootSequence();                 // power-on the eyes (CRT turn-on)
 animLoop();
 scheduleBlink();
 idleDrift();
 setTimeout(microSaccade, 1500 + Math.random()*1000);
-setTimeout(scheduleMoodChange, 8000);
 setTimeout(idleAct, 4000 + Math.random()*3000);
 buildStars();
 
